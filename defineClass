@@ -1,0 +1,153 @@
+var 
+
+eventSplitter = /\s+/,
+
+idCounter = 0,
+
+Events = {
+  on: function(events, callback, context) {
+	var calls, event, list;
+	if (!callback) return this;
+
+	events = events.split(eventSplitter);
+	calls = this._callbacks || (this._callbacks = {});
+
+	while (event = events.shift()) {
+	  list = calls[event] || (calls[event] = []);
+	  list.push(callback, context);
+	}
+
+	return this;
+  },
+
+  off: function(events, callback, context) {
+	var event, calls, list, i;
+
+	if (!(calls = this._callbacks)) return this;
+	if (!(events || callback || context)) {
+	  delete this._callbacks;
+	  return this;
+	}
+
+	events = events ? events.split(eventSplitter) : _.keys(calls);
+
+	// Loop through the callback list, splicing where appropriate.
+	while (event = events.shift()) {
+	  if (!(list = calls[event]) || !(callback || context)) {
+		delete calls[event];
+		continue;
+	  }
+
+	  for (i = list.length - 2; i >= 0; i -= 2) {
+		if (!(callback && list[i] !== callback || context && list[i + 1] !== context)) {
+		  list.splice(i, 2);
+		}
+	  }
+	}
+
+	return this;
+  },
+
+  trigger: function(events) {
+	var event, calls, list, i, length, args, all, rest;
+	if (!(calls = this._callbacks)) return this;
+
+	rest = [];
+	events = events.split(eventSplitter);
+
+	for (i = 1, length = arguments.length; i < length; i++) {
+	  rest[i - 1] = arguments[i];
+	}
+
+	while (event = events.shift()) {
+	  // Copy callback lists to prevent modification.
+	  if (all = calls.all) all = all.slice();
+	  if (list = calls[event]) list = list.slice();
+
+	  if (list) {
+		for (i = 0, length = list.length; i < length; i += 2) {
+		  list[i].apply(list[i + 1] || this, rest);
+		}
+	  }
+
+	  if (all) {
+		args = [event].concat(rest);
+		for (i = 0, length = all.length; i < length; i += 2) {
+		  all[i].apply(all[i + 1] || this, args);
+		}
+	  }
+	}
+
+	return this;
+  }
+},
+
+initializing = false,
+
+fnTest = /xyz/.test(function() {
+  xyz;
+}) ? /\b_super\b/: /.*/,
+
+Class = function() {};
+
+Class.extend = function(prop) {
+  var _super = this.prototype;
+  initializing = true;
+
+  var prototype = new this();
+
+  initializing = false;
+  for (var name in prop) {
+	  prototype[name] = typeof prop[name] == "function" && typeof _super[name] == "function" && fnTest.test(prop[name]) ? (function(name, fn) {
+		  return function() {
+			  var tmp = this._super;
+			  this._super = _super[name];
+			  var ret = fn.apply(this, arguments);
+			  this._super = tmp;
+			  return ret;
+		  };
+	  })(name, prop[name]) : prop[name];
+  }
+
+  for (var name in Events) {
+	  if (Events.hasOwnProperty(name)) {
+		  prototype[name] = Events[name];
+	  };
+  }
+
+  function Class() {
+	  if (!initializing && this.init)
+	   this.init.apply(this, arguments);
+  }
+
+  Class.prototype = prototype;
+  Class.prototype.constructor = Class;
+  Class.extend = arguments.callee;
+  
+  return Class;
+};
+
+
+/**var Plugin = class.extend({
+		
+		a: 1,
+		
+		prototype: {
+			init: function(){
+			alert('init');	
+			
+			this.trigger('init', aaa);
+		}	
+		}
+});
+
+
+var p = new Plugin();
+
+plugin.extend({
+	init : function(){
+	
+	},
+	
+});
+**/
